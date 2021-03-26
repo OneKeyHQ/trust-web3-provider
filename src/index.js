@@ -11,6 +11,7 @@ import RPCServer from "./rpc";
 import ProviderRpcError from "./error";
 import Utils from "./utils";
 import IdMapping from "./id_mapping";
+import PreproccessHandle from "./preproccess";
 import { EventEmitter } from "events";
 import isUtf8 from "isutf8";
 
@@ -24,6 +25,7 @@ class TrustWeb3Provider extends EventEmitter {
     this.wrapResults = new Map();
     this.isTrust = true;
     this.isDebug = !!config.isDebug;
+    this.customHandler = new PreproccessHandle(window.trustwallet.customMethodMessage, this._request, this)
 
     this.emitConnect(config.chainId);
   }
@@ -155,8 +157,11 @@ class TrustWeb3Provider extends EventEmitter {
         case "personal_ecRecover":
           return this.personal_ecRecover(payload);
         case "eth_signTypedData":
+          return this.eth_signTypedData(payload, 'v1');
         case "eth_signTypedData_v3":
-          return this.eth_signTypedData(payload);
+          return this.eth_signTypedData(payload, "v3");
+        case "eth_signTypedData_v4":
+          return this.eth_signTypedData(payload, 'v4');
         case "eth_sendTransaction":
           return this.eth_sendTransaction(payload);
         case "eth_requestAccounts":
@@ -212,12 +217,19 @@ class TrustWeb3Provider extends EventEmitter {
   }
 
   eth_sign(payload) {
-    const buffer = Utils.messageToBuffer(payload.params[1]);
-    const hex = Utils.bufferToHex(buffer);
+    const message = payload.params[1]
+    const buffer = Utils.messageToBuffer(message);
     if (isUtf8(buffer)) {
-      this.postMessage("signPersonalMessage", payload.id, { data: hex });
+      if (buffer.length === 0) {
+        // hex it
+        const hex = Utils.bufferToHex(message);
+        this.postMessage("signPersonalMessage", payload.id, { data: hex, payload: payload.params });
+      } else {
+        this.postMessage("signPersonalMessage", payload.id, { data: message, payload: payload.params });
+      }
     } else {
-      this.postMessage("signMessage", payload.id, { data: hex });
+      const hex = Utils.bufferToHex(buffer);
+      this.postMessage("signMessage", payload.id, { data: hex, payload: payload.params });
     }
   }
 
@@ -227,9 +239,9 @@ class TrustWeb3Provider extends EventEmitter {
     if (buffer.length === 0) {
       // hex it
       const hex = Utils.bufferToHex(message);
-      this.postMessage("signPersonalMessage", payload.id, { data: hex });
+      this.postMessage("signPersonalMessage", payload.id, { data: hex, payload: payload.params });
     } else {
-      this.postMessage("signPersonalMessage", payload.id, { data: message });
+      this.postMessage("signPersonalMessage", payload.id, { data: message, payload: payload.params });
     }
   }
 
@@ -240,9 +252,9 @@ class TrustWeb3Provider extends EventEmitter {
     });
   }
 
-  eth_signTypedData(payload) {
+  eth_signTypedData(payload, version) {
     this.postMessage("signTypedMessage", payload.id, {
-      data: payload.params[1],
+      data: payload.params[1], payload: payload.params, typeVersion: version
     });
   }
 
@@ -278,6 +290,9 @@ class TrustWeb3Provider extends EventEmitter {
         name: handler,
         object: data,
       };
+      if (this.customHandler.handler(handler, id, object)) {
+        return;
+      }
       if (window.trustwallet.postMessage) {
         window.trustwallet.postMessage(object);
       } else {
@@ -345,5 +360,6 @@ class TrustWeb3Provider extends EventEmitter {
 window.trustwallet = {
   Provider: TrustWeb3Provider,
   Web3: Web3,
-  postMessage: null
+  postMessage: null,
+  customMethodMessage: null
 };
