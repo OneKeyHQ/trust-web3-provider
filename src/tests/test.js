@@ -7,24 +7,28 @@
 "use strict";
 
 var ethUtil = require("ethereumjs-util");
+var signUtil = require("eth-sig-util");
 require("../index");
 const Trust = window.Trust;
 const Web3 = require("web3");
 
+const address = "0xcaaf133b00d04b964798f6aa040b445263b458b0";
+const privateKey = "0x5e5c0a55709bfb193b97de696114ad97e9578126e47823e0edf3d5abecd74f71";
+
 const mainnet = {
-  address: "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
+  address: address,
   chainId: 1,
   rpcUrl: "https://mainnet.infura.io/v3/6e822818ec644335be6f0ed231f48310",
 };
 
 const ropsten = {
-  address: "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
+  address: address,
   chainId: 3,
   rpcUrl: "https://ropsten.infura.io/apikey",
 };
 
 const bsc = {
-  address: "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
+  address: address,
   chainId: 56,
   rpcUrl: "https://bsc-dataseed1.binance.orge",
 };
@@ -41,10 +45,10 @@ describe("TrustWeb3Provider constructor tests", () => {
       chainId: 1,
       rpcUrl: "",
     });
-    const address = mainnet.address;
+    const currentAddress = mainnet.address;
     expect(provider.address).toBe("");
 
-    provider.setAddress(address);
+    provider.setAddress(currentAddress);
     expect(provider.address).toBe(address.toLowerCase());
     expect(provider.ready).toBeTruthy();
   });
@@ -91,7 +95,7 @@ describe("TrustWeb3Provider constructor tests", () => {
   test("test eth_accounts", (done) => {
     const provider = new trustwallet.Provider(mainnet);
     const web3 = new Web3(provider);
-    const addresses = ["0x9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f"];
+    const addresses = [address];
 
     web3.eth.getAccounts((error, accounts) => {
       expect(accounts).toEqual(addresses);
@@ -115,18 +119,20 @@ describe("TrustWeb3Provider constructor tests", () => {
   test("test eth_sign", (done) => {
     const provider = new trustwallet.Provider(mainnet);
     const web3 = new Web3(provider);
-    const addresses = ["0x9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f"];
-    const signed =
-      "0x730ec377cfc7090e08366fad4758aad721dbb51e187efe45426a7e56d1ff053947ab1a7b0bd7b138c48a9f3d3b92bd83f4265abbe9876930faaf7fbb980b219d1c";
-
-    trustwallet.postMessage = (message) => {
-      provider.sendResponse(message.id, signed);
-    };
+    const addresses = [address];
 
     var hash = ethUtil.keccak256(
       Buffer.from("An amazing message, for use with MetaMask!", "utf8")
     );
     var hex = "0x" + hash.toString("hex");
+
+    var sign = ethUtil.ecsign(hash, ethUtil.toBuffer(privateKey))
+    const signed = ethUtil.bufferToHex(ethUtil.toRpcSig(sign.v, sign.r, sign.s))
+
+    trustwallet.postMessage = (message) => {
+      provider.sendResponse(message.id, signed);
+    };
+
     web3.eth.sign(addresses[0], hex, (err, result) => {
       expect(result).toEqual(signed);
       done();
@@ -135,8 +141,8 @@ describe("TrustWeb3Provider constructor tests", () => {
 
   test("test personal_sign", (done) => {
     const provider = new trustwallet.Provider(bsc);
-    const signed =
-      "0xf3a9e21a3238b025b7edf5013876548cfb2f2a838aca573de88c91ea9aecf7190cd6330a0172bd5d106841647831f30065f644eddc2f86091e1bb370c9ff833f1c";
+
+    const signed = signUtil.personalSign(ethUtil.toBuffer(privateKey), { "version": "0.1.2", "timestamp": "1602823075", "token": "0x4b0f1812e5df2a09796481ff14017e6005508003", "type": "vote", "payload": { "proposal": "QmSV53XuYi28XfdNHDhBVp2ZQwzeewQNBcaDedRi9PC6eY", "choice": 1, "metadata": {} } })
 
     trustwallet.postMessage = (message) => {
       const buffer = Buffer.from(message.object.data);
@@ -160,6 +166,431 @@ describe("TrustWeb3Provider constructor tests", () => {
     provider.request(request).then((result) => {
       expect(result).toEqual(signed);
       done();
+    });
+  });
+
+  test("test personal_sign custom customMethodMessage signMessageHash", (done) => {
+    trustwallet.customMethodMessage = {
+      signMessageHash: {
+        postMessage: (message) => {
+          var hashMessage = ethUtil.keccak256(ethUtil.toBuffer(message.object.data))
+          var sign = ethUtil.ecsign(hashMessage, ethUtil.toBuffer(privateKey))
+          var signMessage = ethUtil.bufferToHex(signUtil.concatSig(sign.v, sign.r, sign.s))
+
+          provider.sendResponse(message.id, signMessage);
+        }
+      }
+    }
+
+    const provider = new trustwallet.Provider(bsc);
+    provider.isDebug = true;
+
+    var messageHex = '{"version":"0.1.2","timestamp":"1602823075","token":"0x4b0f1812e5df2a09796481ff14017e6005508003","type":"vote","payload":{"proposal":"QmSV53XuYi28XfdNHDhBVp2ZQwzeewQNBcaDedRi9PC6eY","choice":1,"metadata":{}}}'
+
+    const signed = signUtil.personalSign(ethUtil.toBuffer(privateKey), { data: messageHex });
+    const request = {
+      method: "personal_sign",
+      params: [
+        messageHex,
+        address,
+      ],
+      id: 1602823075,
+    };
+
+    expect(Buffer.from(request.params[0], "hex").length).toEqual(0);
+
+    provider.request(request).then((result) => {
+      expect(result).toEqual(signed);
+      done();
+    });
+  });
+
+  test("test eth_sign custom customMethodMessage signMessageHash", (done) => {
+    trustwallet.customMethodMessage = {
+      signMessageHash: {
+        postMessage: (message) => {
+          var hashMessage = ethUtil.keccak256(ethUtil.toBuffer(message.object.data))
+          var signMessage = ethUtil.ecsign(hashMessage, ethUtil.toBuffer(privateKey))
+          var signMessageHex = ethUtil.bufferToHex(signUtil.concatSig(signMessage.v, signMessage.r, signMessage.s))
+          provider.sendResponse(message.id, signMessageHex);
+        }
+      }
+    }
+
+    const provider = new trustwallet.Provider(mainnet);
+
+    var messageHex = ethUtil.bufferToHex(
+      ethUtil.keccak256(
+        ethUtil.toBuffer("An amazing message, for use with MetaMask!", 'utf8')
+      )
+    );
+
+    const messageBuffer = ethUtil.toBuffer(messageHex)
+    var hash = ethUtil.keccak256(messageBuffer);
+    var sign = ethUtil.ecsign(hash, ethUtil.toBuffer(privateKey))
+    const signed = ethUtil.bufferToHex(signUtil.concatSig(sign.v, sign.r, sign.s))
+
+    const request = {
+      method: "eth_sign",
+      params: [
+        address,
+        messageHex,
+      ],
+      id: 160282307545,
+    };
+
+    expect(Buffer.from(request.params[0], "hex").length).toEqual(0);
+
+    provider.request(request).then((result) => {
+      expect(result).toEqual(signed);
+      done();
+    });
+  });
+
+  test("test eth_sign utf8 String custom customMethodMessage signMessageHash", (done) => {
+    trustwallet.customMethodMessage = {
+      signMessageHash: {
+        postMessage: (message) => {
+          var hashMessage = ethUtil.keccak256(ethUtil.toBuffer(message.object.data))
+          var signMessage = ethUtil.ecsign(hashMessage, ethUtil.toBuffer(privateKey))
+          var signMessageHex = ethUtil.bufferToHex(signUtil.concatSig(signMessage.v, signMessage.r, signMessage.s))
+          provider.sendResponse(message.id, signMessageHex);
+        }
+      }
+    }
+
+    const provider = new trustwallet.Provider(mainnet);
+
+    var messageHex = "An amazing message, for use with MetaMask!"
+    const signed = signUtil.personalSign(ethUtil.toBuffer(privateKey), { data: messageHex });
+
+    const request = {
+      method: "eth_sign",
+      params: [
+        address,
+        messageHex,
+      ],
+      id: 160282307545,
+    };
+
+    expect(Buffer.from(request.params[0], "hex").length).toEqual(0);
+
+    provider.request(request).then((result) => {
+      expect(result).toEqual(signed);
+      done();
+    });
+  });
+
+  test("test eth_signTypedData V1 custom customMethodMessage signTypedData", (done) => {
+    trustwallet.customMethodMessage = {
+      signMessageHash: {
+        postMessage: (message) => {
+          var hashMessage = ethUtil.keccak256(ethUtil.toBuffer(message.object.data))
+          var signMessage = ethUtil.ecsign(hashMessage, ethUtil.toBuffer(privateKey))
+          var signMessageHex = ethUtil.bufferToHex(signUtil.concatSig(signMessage.v, signMessage.r, signMessage.s))
+          provider.sendResponse(message.id, signMessageHex);
+        }
+      }
+    }
+
+    const provider = new trustwallet.Provider(mainnet);
+
+    const typedData = [
+      {
+        type: 'string',
+        name: 'Message',
+        value: 'Hi, Alice!'
+      },
+      {
+        type: 'uint32',
+        name: 'A number',
+        value: '1337'
+      }
+    ]
+
+    const msgParams = { data: typedData }
+
+    const signed = signUtil.signTypedMessage(ethUtil.toBuffer(privateKey), msgParams, 'V1')
+
+    const request = {
+      method: "eth_signTypedData",
+      params: [typedData, address],
+      id: 16028230754,
+    };
+
+    provider.request(request).then((result) => {
+      expect(result).toEqual(signed);
+      done();
+    });
+  });
+
+  test("test eth_signTypedData V3 custom customMethodMessage signTypedData", (done) => {
+    trustwallet.customMethodMessage = {
+      signMessageHash: {
+        postMessage: (message) => {
+          var hashMessage = ethUtil.keccak256(ethUtil.toBuffer(message.object.data))
+          var signMessage = ethUtil.ecsign(hashMessage, ethUtil.toBuffer(privateKey))
+          var signMessageHex = ethUtil.bufferToHex(signUtil.concatSig(signMessage.v, signMessage.r, signMessage.s))
+          provider.sendResponse(message.id, signMessageHex);
+        }
+      }
+    }
+
+    const provider = new trustwallet.Provider(mainnet);
+
+    const typedData = JSON.stringify({
+      types: {
+        EIP712Domain: [
+          { name: 'name', type: 'string' },
+          { name: 'version', type: 'string' },
+          { name: 'chainId', type: 'uint256' },
+          { name: 'verifyingContract', type: 'address' },
+        ],
+        Person: [
+          { name: 'name', type: 'string' },
+          { name: 'wallet', type: 'address' },
+        ],
+        Mail: [
+          { name: 'from', type: 'Person' },
+          { name: 'to', type: 'Person' },
+          { name: 'contents', type: 'string' },
+        ],
+      },
+      primaryType: 'Mail',
+      domain: {
+        name: 'Ether Mail',
+        version: '1',
+        chainId: 1,
+        verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC',
+      },
+      message: {
+        from: {
+          name: 'Cow',
+          wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826',
+        },
+        to: {
+          name: 'Bob',
+          wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+        },
+        contents: 'Hello, Bob!',
+      },
+    })
+
+    const msgParams = { data: JSON.parse(typedData) }
+
+    const signed = signUtil.signTypedMessage(ethUtil.toBuffer(privateKey), msgParams, 'V3')
+
+    const request = {
+      method: "eth_signTypedData_v3",
+      params: [typedData, address],
+      id: 16028130754,
+    };
+
+    provider.request(request).then((result) => {
+      expect(result).toEqual(signed);
+      done();
+    });
+  });
+
+  test("test eth_signTypedData V4 string custom customMethodMessage signTypedData", (done) => {
+    trustwallet.customMethodMessage = {
+      signMessageHash: {
+        postMessage: (message) => {
+          var hashMessage = ethUtil.keccak256(ethUtil.toBuffer(message.object.data))
+          var signMessage = ethUtil.ecsign(hashMessage, ethUtil.toBuffer(privateKey))
+          var signMessageHex = ethUtil.bufferToHex(signUtil.concatSig(signMessage.v, signMessage.r, signMessage.s))
+          provider.sendResponse(message.id, signMessageHex);
+        }
+      }
+    }
+
+    const provider = new trustwallet.Provider(mainnet);
+
+    const typedData = JSON.stringify({
+      types: {
+        EIP712Domain: [
+          { name: 'name', type: 'string' },
+          { name: 'version', type: 'string' },
+          { name: 'chainId', type: 'uint256' },
+          { name: 'verifyingContract', type: 'address' },
+        ],
+        Person: [
+          { name: 'name', type: 'string' },
+          { name: 'wallets', type: 'address[]' },
+        ],
+        Mail: [
+          { name: 'from', type: 'Person' },
+          { name: 'to', type: 'Person[]' },
+          { name: 'contents', type: 'string' },
+        ],
+        Group: [
+          { name: 'name', type: 'string' },
+          { name: 'members', type: 'Person[]' },
+        ],
+      },
+      domain: {
+        name: 'Ether Mail',
+        version: '1',
+        chainId: 1,
+        verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC',
+      },
+      primaryType: 'Mail',
+      message: {
+        from: {
+          name: 'Cow',
+          wallets: [
+            '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826',
+            '0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF',
+          ],
+        },
+        to: [{
+          name: 'Bob',
+          wallets: [
+            '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+            '0xB0BdaBea57B0BDABeA57b0bdABEA57b0BDabEa57',
+            '0xB0B0b0b0b0b0B000000000000000000000000000',
+          ],
+        }],
+        contents: 'Hello, Bob!',
+      },
+    })
+
+    const msgParams = { data: JSON.parse(typedData) }
+
+    const signed = signUtil.signTypedMessage(ethUtil.toBuffer(privateKey), msgParams, 'V4')
+
+    const request = {
+      method: "eth_signTypedData_v4",
+      params: [typedData, address],
+      id: 16028130754,
+    };
+
+    provider.request(request).then((result) => {
+      expect(result).toEqual(signed);
+      done();
+    });
+  });
+
+  test("test eth_signTypedData V4 object custom customMethodMessage signTypedData", (done) => {
+    trustwallet.customMethodMessage = {
+      signMessageHash: {
+        postMessage: (message) => {
+          var hashMessage = ethUtil.keccak256(ethUtil.toBuffer(message.object.data))
+          var signMessage = ethUtil.ecsign(hashMessage, ethUtil.toBuffer(privateKey))
+          var signMessageHex = ethUtil.bufferToHex(signUtil.concatSig(signMessage.v, signMessage.r, signMessage.s))
+          provider.sendResponse(message.id, signMessageHex);
+        }
+      }
+    }
+
+    const provider = new trustwallet.Provider(mainnet);
+
+    const typedData = {
+      types: {
+        EIP712Domain: [
+          { name: 'name', type: 'string' },
+          { name: 'version', type: 'string' },
+          { name: 'chainId', type: 'uint256' },
+          { name: 'verifyingContract', type: 'address' },
+        ],
+        Person: [
+          { name: 'name', type: 'string' },
+          { name: 'wallets', type: 'address[]' },
+        ],
+        Mail: [
+          { name: 'from', type: 'Person' },
+          { name: 'to', type: 'Person[]' },
+          { name: 'contents', type: 'string' },
+        ],
+        Group: [
+          { name: 'name', type: 'string' },
+          { name: 'members', type: 'Person[]' },
+        ],
+      },
+      domain: {
+        name: 'Ether Mail',
+        version: '1',
+        chainId: 1,
+        verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC',
+      },
+      primaryType: 'Mail',
+      message: {
+        from: {
+          name: 'Cow',
+          wallets: [
+            '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826',
+            '0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF',
+          ],
+        },
+        to: [{
+          name: 'Bob',
+          wallets: [
+            '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+            '0xB0BdaBea57B0BDABeA57b0bdABEA57b0BDabEa57',
+            '0xB0B0b0b0b0b0B000000000000000000000000000',
+          ],
+        }],
+        contents: 'Hello, Bob!',
+      },
+    }
+
+    const msgParams = { data: typedData }
+
+    const signed = signUtil.signTypedMessage(ethUtil.toBuffer(privateKey), msgParams, 'V4')
+
+    const request = {
+      method: "eth_signTypedData_v4",
+      params: [typedData, address],
+      id: 16028130754,
+    };
+
+    provider.request(request).then((result) => {
+      expect(result).toEqual(signed);
+      done();
+    });
+  });
+
+
+  test("test personal_ecRecover custom customMethodMessage personalEcRecover", (done) => {
+    trustwallet.customMethodMessage = {
+      signMessageHash: {
+        postMessage: (message) => {
+          var hashMessage = ethUtil.keccak256(ethUtil.toBuffer(message.object.data))
+          var signMessage = ethUtil.ecsign(hashMessage, ethUtil.toBuffer(privateKey))
+          var signMessageHex = ethUtil.bufferToHex(signUtil.concatSig(signMessage.v, signMessage.r, signMessage.s))
+          provider.sendResponse(message.id, signMessageHex);
+        }
+      },
+      personalEcRecover: {
+        postMessage: (message) => {
+          provider.sendResponse(message.id, message.object.data);
+        }
+      }
+    }
+
+    const provider = new trustwallet.Provider(mainnet);
+
+    var messageHex = ethUtil.bufferToHex(Buffer.from("hello", 'utf8'))
+
+    const request = {
+      method: "personal_sign",
+      params: [messageHex, address],
+      id: 16028230754,
+    };
+
+
+    provider.request(request).then((result) => {
+
+      var recoverRequest = {
+        method: "personal_ecRecover",
+        params: [messageHex, result],
+        id: 16026230754,
+      };
+
+      provider.request(recoverRequest).then((recoverResult) => {
+        expect(recoverResult).toEqual(address);
+        done();
+      });
     });
   });
 }); // end of top describe()
