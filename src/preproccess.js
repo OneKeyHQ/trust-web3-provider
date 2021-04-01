@@ -5,6 +5,7 @@ import ethUtil from "ethereumjs-util";
 import waterfall from "async/waterfall";
 import parallel from "async/parallel";
 import extend from "xtend";
+import isUtf8 from "isutf8";
 import { TypedDataUtils, typedSignatureHash, hashPersonalMessage } from "./hashMessage"
 
 const hexRegex = /^[0-9A-Fa-f]+$/g
@@ -64,11 +65,13 @@ class PreproccessHandle {
     //
     handlerSignMessage(id, method, data, callback) {
 
+        let message = data.object.payload[1]
+
         // let hash = hashMessage(data.object.data)
         let msgParams = {
             from: data.object.payload[0],
             data: data.object.data,
-            params: data.object.payload,
+            params: message,
         }
 
         let jsoRpcRequest = {
@@ -97,6 +100,11 @@ class PreproccessHandle {
         } else {
             message = payload[0]
             address = payload[1]
+        }
+
+        let messageBuffer = ethUtil.toBuffer(message)
+        if(isUtf8(messageBuffer)){
+            message = Buffer.from(messageBuffer).toString()
         }
 
         let hash = hashPersonalMessage(data.object.data)
@@ -133,29 +141,30 @@ class PreproccessHandle {
             address = payload[1]
         }
 
-        let hash;
+        if (typeof (message) == 'string') {
+            message = JSON.parse(message)
+        }
+
+        let hashData;
         if (data.object.typeVersion === 'v1') {
-            console.log("handlerSignTypedMessage:::::: "+JSON.stringify(message) +"     "+typeof (message))
-            if (typeof (message) == 'string') {
-                message = JSON.parse(message)
-            }
-            hash = typedSignatureHash(message)
+            hashData = typedSignatureHash(message)
         } else if (data.object.typeVersion === 'v3') {
-            if (typeof (message) == 'string') {
-                message = JSON.parse(message)
-            }
-            hash = TypedDataUtils.sign(message, false)
+            hashData = TypedDataUtils.sign(message, false)
         } else if (data.object.typeVersion === 'v4') {
-            if (typeof (message) == 'string') {
-                message = JSON.parse(message)
-            }
-            hash = TypedDataUtils.sign(message)
+            hashData = TypedDataUtils.sign(message)
+        }
+
+        let hash = hashData.hex
+        let messageData = hashData.data
+
+        if (typeof (messageData) == 'object') {
+            messageData = JSON.stringify(message)
         }
 
         let msgParams = {
             from: address,
             data: hash,
-            params: message,
+            params: messageData,
         }
 
         let jsoRpcRequest = {

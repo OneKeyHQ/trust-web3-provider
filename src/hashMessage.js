@@ -75,10 +75,13 @@ export const typedSignatureHash = (typedData) => {
     //     ],
     // )
 
-    return ethUtil.bufferToHex(Buffer.concat([
-        ethAbi.soliditySHA3(new Array(typedData.length).fill('string'), schema),
-        ethAbi.soliditySHA3(types, data),
-    ]));
+    return {
+        hex: ethUtil.bufferToHex(Buffer.concat([
+            ethAbi.soliditySHA3(new Array(typedData.length).fill('string'), schema),
+            ethAbi.soliditySHA3(types, data),
+        ])),
+        data: data
+    }
 }
 
 /**
@@ -271,6 +274,9 @@ export const TypedDataUtils = {
             parts.push(this.hashStruct(sanitizedData.primaryType, sanitizedData.message, sanitizedData.types, useV4))
         }
         // return ethUtil.keccak(Buffer.concat(parts))
-        return ethUtil.bufferToHex(Buffer.concat(parts))
+        return {
+            hex: ethUtil.bufferToHex(Buffer.concat(parts)),
+            data: sanitizedData.message
+        }
     },
 }
