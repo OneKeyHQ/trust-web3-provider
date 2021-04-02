@@ -158,7 +158,7 @@ class PreproccessHandle {
         let messageData = hashData.data
 
         if (typeof (messageData) == 'object') {
-            messageData = JSON.stringify(message)
+            messageData = JSON.stringify(messageData)
         }
 
         let msgParams = {
