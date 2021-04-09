@@ -53,6 +53,24 @@ describe("TrustWeb3Provider constructor tests", () => {
     expect(provider.ready).toBeTruthy();
   });
 
+  test("test change setAddress", (done) => {
+    const provider = new trustwallet.Provider({
+      chainId: 1,
+      rpcUrl: "",
+    });
+    const currentAddress = mainnet.address;
+    expect(provider.address).toBe("");
+
+    provider.on('accountsChanged', (accounts) => {
+      expect(accounts[0]).toBe(address.toLowerCase());
+      expect(provider.ready).toBeTruthy();
+      done();
+    });
+
+    provider.onekeyChangeAddress(currentAddress);
+
+  });
+
   test("test setConfig", (done) => {
     const provider = new trustwallet.Provider(ropsten);
     const web3 = new Web3(provider);
@@ -70,6 +88,58 @@ describe("TrustWeb3Provider constructor tests", () => {
       expect(id).toBe("1");
       done();
     });
+  });
+
+  test("test change RpcUrl", () => {
+    const provider = new trustwallet.Provider(ropsten);
+    const web3 = new Web3(provider);
+
+    expect(web3.currentProvider.chainId).toEqual(3);
+
+    web3.currentProvider.setConfig(mainnet);
+
+    var changeRpcUrl = "https://www.baidu.com"
+
+    provider.onekeyChangeRpcUrl(changeRpcUrl)
+    expect(provider.rpc.rpcUrl).toBe(changeRpcUrl);
+  });
+  
+  test("test change chainId", (done) => {
+    const provider = new trustwallet.Provider(ropsten);
+    const web3 = new Web3(provider);
+
+    expect(web3.currentProvider.chainId).toEqual(3);
+
+    web3.currentProvider.setConfig(mainnet);
+
+    var changeChainId = 5
+
+    provider.on('chainChanged', (chainId) => {
+      expect(chainId).toBe(changeChainId);
+      done();
+    });
+
+    provider.onekeyChangeChainId(changeChainId)
+  });
+
+  test("test change chainId And RpcUrl", (done) => {
+    const provider = new trustwallet.Provider(ropsten);
+    const web3 = new Web3(provider);
+
+    expect(web3.currentProvider.chainId).toEqual(3);
+
+    web3.currentProvider.setConfig(mainnet);
+
+    var changeChainId = 5
+    var changeRpcUrl = "https://www.baidu.com"
+
+    provider.on('chainChanged', (chainId) => {
+      expect(chainId).toBe(changeChainId);
+      expect(provider.rpc.rpcUrl).toBe(changeRpcUrl);
+      done();
+    });
+
+    provider.onekeyChangeChainId(changeChainId, changeRpcUrl)
   });
 
   test("test eth_chainId", (done) => {
