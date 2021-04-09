@@ -28,11 +28,25 @@ class TrustWeb3Provider extends EventEmitter {
     this.customHandler = new PreproccessHandle(window.trustwallet.customMethodMessage, this._request, this)
 
     this.emitConnect(config.chainId);
+
+    // @deprecated Use ethereum.request({ method: 'eth_accounts' }) instead.
+    this.selectedAddress = config.address
+
+    // @deprecated Use ethereum.request({ method: 'eth_chainId' }) instead.
+    if (config.chainId) { this.networkVersion = config.chainId.toString(10) }
   }
 
   setAddress(address) {
-    this.address = (address || "").toLowerCase();
+    const lowerAddress = (address || "").toLowerCase();
+    this.address = lowerAddress;
     this.ready = !!address;
+    for (var i = 0; i < window.frames.length; i++) {
+      const frame = window.frames[i];
+      if (frame.ethereum.isTrust) {
+        frame.ethereum.address = lowerAddress;
+        frame.ethereum.ready = !!address;
+      }
+    }
   }
 
   setConfig(config) {
@@ -41,6 +55,24 @@ class TrustWeb3Provider extends EventEmitter {
     this.chainId = config.chainId;
     this.rpc = new RPCServer(config.rpcUrl);
     this.isDebug = !!config.isDebug;
+  }
+
+  onekeyChangeAddress(address) {
+    this.setAddress(address);
+    this.emit("accountsChanged", [address]);
+  }
+
+  onekeyChangeChainId(chainId, rpcUrl) {
+    this.chainId = chainId;
+    this.onekeyChangeRpcUrl(rpcUrl)
+    this.emit("chainChanged", chainId);
+    this.emit("networkChanged", chainId);
+  }
+
+  onekeyChangeRpcUrl(rpcUrl) {
+    if (rpcUrl) {
+      this.rpc = new RPCServer(rpcUrl);
+    }
   }
 
   request(payload) {
