@@ -104,8 +104,30 @@ class TrustWeb3Provider extends EventEmitter {
   /**
    * @deprecated Use request() method instead.
    */
-  send(payload) {
+  send(payload, params) {
+    if (typeof (payload) == 'string') {
+      let request = { jsonrpc: "2.0", method: payload, params: params }
+      console.log(
+        "send(methed, params) is deprecated, please use window.ethereum.request(data) instead."
+      );
+      var that = this;
+      if (!(this instanceof TrustWeb3Provider)) {
+        that = window.ethereum;
+      }
+      return that._request(request)
+    }
+
+    if (params && !Array.isArray(params)) {
+      // Params may be a callback
+      console.log(
+        "send(payload, callback) is deprecated, please use window.ethereum.request(data) instead."
+      );
+      this.sendAsync(payload, params);
+      return;
+    }
+
     let response = { jsonrpc: "2.0", id: payload.id };
+
     switch (payload.method) {
       case "eth_accounts":
         response.result = this.eth_accounts();
@@ -125,6 +147,10 @@ class TrustWeb3Provider extends EventEmitter {
           `Trust does not support calling ${payload.method} synchronously without a callback. Please provide a callback parameter to call ${payload.method} asynchronously.`
         );
     }
+
+    console.log(
+      "send(payload) is deprecated, please use window.ethereum.request(data) instead."
+    );
     return response;
   }
 

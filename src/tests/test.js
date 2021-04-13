@@ -103,7 +103,7 @@ describe("TrustWeb3Provider constructor tests", () => {
     provider.onekeyChangeRpcUrl(changeRpcUrl)
     expect(provider.rpc.rpcUrl).toBe(changeRpcUrl);
   });
-  
+
   test("test change chainId", (done) => {
     const provider = new trustwallet.Provider(ropsten);
     const web3 = new Web3(provider);
@@ -140,6 +140,36 @@ describe("TrustWeb3Provider constructor tests", () => {
     });
 
     provider.onekeyChangeChainId(changeChainId, changeRpcUrl)
+  });
+
+  test("test send method", (done) => {
+    const provider = new trustwallet.Provider(bsc);
+    const web3 = new Web3(provider);
+
+    let request = { jsonrpc: "2.0", method: "eth_chainId", id: 123 };
+
+    provider.request(request).then((chainId) => {
+      expect(chainId).toEqual("0x38");
+    });
+
+    web3.currentProvider.send("eth_chainId").then((result) => {
+      expect(result.result).toEqual("0x38");
+    }).catch((error) => {
+      console.error(error)
+      done(error);
+    });
+
+    web3.currentProvider.send(request, (error, result) => {
+      expect(result.result).toEqual("0x38");
+    });
+
+    let response = web3.currentProvider.send(request);
+    expect(response.result).toEqual("0x38");
+
+    web3.currentProvider.sendAsync(request, (error, result) => {
+      expect(result.result).toEqual("0x38");
+      done();
+    });
   });
 
   test("test eth_chainId", (done) => {
