@@ -160,7 +160,7 @@ describe("TrustWeb3Provider constructor tests", () => {
     });
 
     web3.currentProvider.send(request, (error, result) => {
-      expect(result.result).toEqual("0x38");
+      expect(result).toEqual("0x38");
     });
 
     let response = web3.currentProvider.send(request);

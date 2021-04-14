@@ -105,24 +105,35 @@ class TrustWeb3Provider extends EventEmitter {
    * @deprecated Use request() method instead.
    */
   send(payload, params) {
+    var that = this;
+    if (!(this instanceof TrustWeb3Provider)) {
+      that = window.ethereum;
+    }
+
     if (typeof (payload) == 'string') {
       let request = { jsonrpc: "2.0", method: payload, params: params }
       console.log(
         "send(methed, params) is deprecated, please use window.ethereum.request(data) instead."
       );
-      var that = this;
-      if (!(this instanceof TrustWeb3Provider)) {
-        that = window.ethereum;
-      }
       return that._request(request)
     }
 
-    if (params && !Array.isArray(params)) {
+    if ((typeof (params) == 'object' || Array.isArray(payload)) && params && typeof (params) == 'function') {
       // Params may be a callback
+      var callback = params;
       console.log(
         "send(payload, callback) is deprecated, please use window.ethereum.request(data) instead."
       );
-      this.sendAsync(payload, params);
+      if (Array.isArray(payload)) {
+        Promise.all(payload.map(that._request.bind(that)))
+          .then((data) => callback(null, data.result))
+          .catch((error) => callback(error, null));
+      } else {
+        that
+          ._request(payload)
+          .then((data) => callback(null, data.result))
+          .catch((error) => callback(error, null));
+      }
       return;
     }
 
