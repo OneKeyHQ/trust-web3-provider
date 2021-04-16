@@ -72,6 +72,7 @@ class PreproccessHandle {
             from: data.object.payload[0],
             data: data.object.data,
             params: message,
+            rawMessage: message
         }
 
         let jsoRpcRequest = {
@@ -103,7 +104,7 @@ class PreproccessHandle {
         }
 
         let messageBuffer = ethUtil.toBuffer(message)
-        if(isUtf8(messageBuffer)){
+        if (isUtf8(messageBuffer)) {
             message = Buffer.from(messageBuffer).toString()
         }
 
@@ -112,6 +113,7 @@ class PreproccessHandle {
             from: address,
             data: hash,
             params: message,
+            rawMessage: message
         }
 
         let jsoRpcRequest = {
@@ -167,9 +169,15 @@ class PreproccessHandle {
             params: messageData,
         }
 
+        var methodVersion;
+        if (data.object.typeVersion) {
+            methodVersion = data.object.typeVersion.toUpperCase()
+        } else {
+            methodVersion = ''
+        }
         let jsoRpcRequest = {
             id: id,
-            name: method,
+            name: method + methodVersion,
             object: msgParams,
         };
 
