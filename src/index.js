@@ -15,6 +15,8 @@ import PreproccessHandle from "./preproccess";
 import { EventEmitter } from "events";
 import isUtf8 from "isutf8";
 
+const isHexadecimal = str => /^0x[A-Fa-f0-9]+$/i.test(str)
+
 class TrustWeb3Provider extends EventEmitter {
   constructor(config) {
     super();
@@ -24,6 +26,7 @@ class TrustWeb3Provider extends EventEmitter {
     this.callbacks = new Map();
     this.wrapResults = new Map();
     this.isTrust = true;
+    this.isOnekey = true;
     this.isDebug = !!config.isDebug;
     this.customHandler = new PreproccessHandle(window.trustwallet.customMethodMessage, this._request, this)
 
@@ -33,7 +36,7 @@ class TrustWeb3Provider extends EventEmitter {
     this.selectedAddress = config.address
 
     // @deprecated Use ethereum.request({ method: 'eth_chainId' }) instead.
-    if (config.chainId) { this.networkVersion = config.chainId.toString(10) }
+    if (config.chainId) { this.networkVersion = parseInt("this.chainId", 16) }
   }
 
   setAddress(address) {
@@ -42,17 +45,33 @@ class TrustWeb3Provider extends EventEmitter {
     this.ready = !!address;
     for (var i = 0; i < window.frames.length; i++) {
       const frame = window.frames[i];
-      if (frame.ethereum.isTrust) {
+      if (frame.ethereum && frame.ethereum.isTrust) {
         frame.ethereum.address = lowerAddress;
         frame.ethereum.ready = !!address;
       }
     }
   }
 
+  setChainId(chainId) {
+    let hexChainId
+    if (isHexadecimal(chainId)) {
+      hexChainId = chainId;
+    } else {
+      hexChainId = "0x" + chainId.toString(16);
+    }
+    this.chainId = hexChainId;
+    for (var i = 0; i < window.frames.length; i++) {
+      const frame = window.frames[i];
+      if (frame.ethereum && frame.ethereum.isTrust) {
+        frame.ethereum.chainId = hexChainId;
+      }
+    }
+  }
+
   setConfig(config) {
     this.setAddress(config.address);
+    this.setChainId(config.chainId);
 
-    this.chainId = config.chainId;
     this.rpc = new RPCServer(config.rpcUrl);
     this.isDebug = !!config.isDebug;
   }
@@ -63,10 +82,11 @@ class TrustWeb3Provider extends EventEmitter {
   }
 
   onekeyChangeChainId(chainId, rpcUrl) {
-    this.chainId = chainId;
+    this.setChainId(chainId);
     this.onekeyChangeRpcUrl(rpcUrl)
-    this.emit("chainChanged", chainId);
-    this.emit("networkChanged", chainId);
+    this.emit("chainChanged", this.chainId);
+    this.emit("chainIdChanged", this.chainId);
+    this.emit("networkChanged", this.chainId);
   }
 
   onekeyChangeRpcUrl(rpcUrl) {
@@ -282,7 +302,7 @@ class TrustWeb3Provider extends EventEmitter {
   }
 
   eth_chainId() {
-    return "0x" + this.chainId.toString(16);
+    return this.chainId;
   }
 
   eth_sign(payload) {

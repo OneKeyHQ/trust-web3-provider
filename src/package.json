@@ -39,7 +39,7 @@
     "ethereumjs-abi": "0.6.8",
     "ethereumjs-util": "^5.1.5",
     "jest": "^23.6.0",
-    "lodash": "^4.17.20",
+    "lodash": "^4.17.21",
     "parcel-bundler": "^1.12.5"
   }
 }
