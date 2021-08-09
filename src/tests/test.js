@@ -18,7 +18,7 @@ const privateKey = "0x5e5c0a55709bfb193b97de696114ad97e9578126e47823e0edf3d5abec
 const mainnet = {
   address: address,
   chainId: 1,
-  rpcUrl: "https://mainnet.infura.io/v3/6e822818ec644335be6f0ed231f48310",
+  rpcUrl: "https://mainnet.infura.io/v3/<key>",
 };
 
 const ropsten = {
@@ -75,17 +75,17 @@ describe("TrustWeb3Provider constructor tests", () => {
     const provider = new trustwallet.Provider(ropsten);
     const web3 = new Web3(provider);
 
-    expect(web3.currentProvider.chainId).toEqual(3);
+    expect(web3.currentProvider.chainId).toEqual("0x3");
 
     web3.currentProvider.setConfig(mainnet);
-    expect(web3.currentProvider.chainId).toEqual(1);
+    expect(web3.currentProvider.chainId).toEqual("0x1");
     expect(web3.currentProvider.rpc.rpcUrl).toBe(mainnet.rpcUrl);
 
     expect(provider.request).not.toBeUndefined;
     expect(provider.on).not.toBeUndefined;
 
     web3.version.getNetwork((error, id) => {
-      expect(id).toBe("1");
+      expect(id).toBe("0x1");
       done();
     });
   });
@@ -94,7 +94,7 @@ describe("TrustWeb3Provider constructor tests", () => {
     const provider = new trustwallet.Provider(ropsten);
     const web3 = new Web3(provider);
 
-    expect(web3.currentProvider.chainId).toEqual(3);
+    expect(web3.currentProvider.chainId).toEqual("0x3");
 
     web3.currentProvider.setConfig(mainnet);
 
@@ -108,14 +108,14 @@ describe("TrustWeb3Provider constructor tests", () => {
     const provider = new trustwallet.Provider(ropsten);
     const web3 = new Web3(provider);
 
-    expect(web3.currentProvider.chainId).toEqual(3);
+    expect(web3.currentProvider.chainId).toEqual("0x3");
 
     web3.currentProvider.setConfig(mainnet);
 
     var changeChainId = 5
 
     provider.on('chainChanged', (chainId) => {
-      expect(chainId).toBe(changeChainId);
+      expect(chainId).toBe("0x5");
       done();
     });
 
@@ -126,7 +126,7 @@ describe("TrustWeb3Provider constructor tests", () => {
     const provider = new trustwallet.Provider(ropsten);
     const web3 = new Web3(provider);
 
-    expect(web3.currentProvider.chainId).toEqual(3);
+    expect(web3.currentProvider.chainId).toEqual("0x3");
 
     web3.currentProvider.setConfig(mainnet);
 
@@ -134,7 +134,7 @@ describe("TrustWeb3Provider constructor tests", () => {
     var changeRpcUrl = "https://www.baidu.com"
 
     provider.on('chainChanged', (chainId) => {
-      expect(chainId).toBe(changeChainId);
+      expect(chainId).toBe("0x5");
       expect(provider.rpc.rpcUrl).toBe(changeRpcUrl);
       done();
     });
@@ -256,6 +256,7 @@ describe("TrustWeb3Provider constructor tests", () => {
       method: "personal_sign",
       params: [
         "{\"version\":\"0.1.2\",\"timestamp\":\"1602823075\",\"token\":\"0x4b0f1812e5df2a09796481ff14017e6005508003\",\"type\":\"vote\",\"payload\":{\"proposal\":\"QmSV53XuYi28XfdNHDhBVp2ZQwzeewQNBcaDedRi9PC6eY\",\"choice\":1,\"metadata\":{}}}",
+        "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
       ],
       id: 1602823075454,
     };

@@ -23,9 +23,9 @@
   "dependencies": {
     "async": "^2.5.0",
     "buffer": "^5.6.0",
+    "events": "^3.2.0",
     "ethereumjs-abi": "0.6.8",
     "ethereumjs-util": "^5.1.5",
-    "events": "^3.2.0",
     "isutf8": "^3.1.1",
     "web3": "^0.20.7",
     "xtend": "^4.0.2"
@@ -40,6 +40,6 @@
     "ethereumjs-util": "^5.1.5",
     "jest": "^23.6.0",
     "lodash": "^4.17.21",
-    "parcel-bundler": "^1.12.5"
+    "parcel-bundler": "^1.12.4"
   }
 }

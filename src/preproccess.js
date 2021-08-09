@@ -6,9 +6,8 @@ import waterfall from "async/waterfall";
 import parallel from "async/parallel";
 import extend from "xtend";
 import isUtf8 from "isutf8";
+import Utils from "./utils";
 import { TypedDataUtils, typedSignatureHash, hashPersonalMessage } from "./hashMessage"
-
-const hexRegex = /^[0-9A-Fa-f]+$/g
 
 class PreproccessHandle {
     constructor(postMessage, request, provider) {
@@ -64,13 +63,12 @@ class PreproccessHandle {
     // web3 function
     //
     handlerSignMessage(id, method, data, callback) {
+        let message = data.object.data
+        let address = data.object.from
 
-        let message = data.object.payload[1]
-
-        // let hash = hashMessage(data.object.data)
         let msgParams = {
-            from: data.object.payload[0],
-            data: data.object.data,
+            from: address,
+            data: message,
             params: message,
             rawMessage: message
         }
@@ -89,21 +87,10 @@ class PreproccessHandle {
     }
 
     handlerSignPersonalMessage(id, method, data, callback) {
-
-        let payload = data.object.payload
-        const first = payload[0]
-        const second = payload[1]
-
-        let message, address;
-        if (this.resemblesData(second) && this.resemblesAddress(first)) {
-            address = payload[0]
-            message = payload[1]
-        } else {
-            message = payload[0]
-            address = payload[1]
-        }
-
-        let messageBuffer = ethUtil.toBuffer(message)
+        let message = data.object.data
+        let address = data.object.from
+        
+        let messageBuffer = Utils.toBuffer(message)
         if (isUtf8(messageBuffer)) {
             message = Buffer.from(messageBuffer).toString()
         }
@@ -130,18 +117,8 @@ class PreproccessHandle {
     }
 
     handlerSignTypedMessage(id, method, data, callback) {
-        let payload = data.object.payload
-        const first = payload[0]
-        const second = JSON.stringify(payload[1])
-
-        let message, address;
-        if (this.resemblesData(second) && this.resemblesAddress(first)) {
-            address = payload[0]
-            message = payload[1]
-        } else {
-            message = payload[0]
-            address = payload[1]
-        }
+        let message = data.object.data
+        let address = data.object.from
 
         if (typeof (message) == 'string') {
             message = JSON.parse(message)
@@ -189,14 +166,13 @@ class PreproccessHandle {
     }
 
     handlerEcRecover(id, method, data, callback) {
-
         const recoverParams = { data: data.object.message, sig: data.object.signature }
         let senderHex
         try {
-            const message = ethUtil.toBuffer(recoverParams.data)
+            const message = Utils.toBuffer(recoverParams.data)
             const msgHash = ethUtil.hashPersonalMessage(message)
 
-            const signature = ethUtil.toBuffer(recoverParams.sig)
+            const signature = Utils.toBuffer(recoverParams.sig)
             const sigParams = ethUtil.fromRpcSig(signature)
             const publicKey = ethUtil.ecrecover(msgHash, sigParams.v, sigParams.r, sigParams.s)
 
@@ -356,7 +332,7 @@ class PreproccessHandle {
         const self = this
         if (msgParams.from === undefined) return cb(new Error(`Undefined address - from address required to sign personal message.`))
         if (msgParams.data === undefined) return cb(new Error(`Undefined message - message required to sign personal message.`))
-        if (!this.isValidHex(msgParams.data)) return cb(new Error(`HookedWalletSubprovider - validateMessage - message was not encoded as hex.`))
+        if (!Utils.isValidHex(msgParams.data)) return cb(new Error(`HookedWalletSubprovider - validateMessage - message was not encoded as hex.`))
         self.validateSender(msgParams.from, function (err, senderIsValid) {
             if (err) return cb(err)
             if (!senderIsValid) return cb(new Error(`Unknown address - unable to sign message for this address: "${msgParams.from}"`))
@@ -491,27 +467,16 @@ class PreproccessHandle {
     }
 
     resemblesAddress(string) {
-        const fixed = ethUtil.addHexPrefix(string)
-        const isValid = ethUtil.isValidAddress(fixed)
-        return isValid
+        const fixed = Utils.addHexPrefix(string)
+        return Utils.isValidAddress(fixed)
     }
 
     // Returns true if resembles hex data
     // but definitely not a valid address.
     resemblesData(string) {
-        const fixed = ethUtil.addHexPrefix(string)
-        const isValidAddress = ethUtil.isValidAddress(fixed)
-        return !isValidAddress && (this.isValidHex(string) || typeof (string) == 'string')
-    }
-
-    isValidHex(data) {
-        const isString = typeof data === 'string'
-        if (!isString) return false
-        const isHexPrefixed = data.slice(0, 2) === '0x'
-        if (!isHexPrefixed) return false
-        const nonPrefixed = data.slice(2)
-        const isValid = nonPrefixed.match(hexRegex)
-        return isValid
+        const fixed = Utils.addHexPrefix(string)
+        const isValidAddress = Utils.isValidAddress(fixed)
+        return !isValidAddress && (Utils.isValidHex(string) || typeof (string) == 'string')
     }
 
     mustProvideInConstructor(methodName) {

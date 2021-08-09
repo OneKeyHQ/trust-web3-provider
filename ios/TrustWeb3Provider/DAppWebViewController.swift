@@ -13,7 +13,7 @@ class DAppWebViewController: UIViewController {
     @IBOutlet weak var urlField: UITextField!
 
     var homepage: String {
-        return "https://chainlist.org"
+        return "http://js-eth-sign.surge.sh/"
     }
 
     let privateKey = PrivateKey(data: Data(hexString: "0x4646464646464646464646464646464646464646464646464646464646464646")!)!
@@ -21,8 +21,8 @@ class DAppWebViewController: UIViewController {
     lazy var scriptConfig: WKUserScriptConfig = {
         return WKUserScriptConfig(
             address: address,
-            chainId: 1,
-            rpcUrl: "https://mainnet.infura.io/v3/6e822818ec644335be6f0ed231f48310"
+            chainId: 56,
+            rpcUrl: "https://bsc-dataseed2.binance.org"
         )
     }()
 
@@ -101,14 +101,21 @@ extension DAppWebViewController: WKScriptMessageHandler {
                 return
             }
             handleSignMessage(id: id, data: data, addPrefix: false)
-            break
         case .signPersonalMessage:
             guard let data = extractMessage(json: json) else {
                 print("data is missing")
                 return
             }
             handleSignMessage(id: id, data: data, addPrefix: true)
-            break
+        case .signTypedMessage:
+            guard
+                let data = extractMessage(json: json),
+                let raw = extractRaw(json: json)
+            else {
+                print("data or raw json is missing")
+                return
+            }
+            handleSignTypedMessage(id: id, data: data, raw: raw)
         case .ecRecover:
             guard let tuple = extractSignature(json: json) else {
                 print("signature or message is missing")
@@ -119,7 +126,6 @@ extension DAppWebViewController: WKScriptMessageHandler {
             DispatchQueue.main.async {
                 self.webview.sendResult(recovered, to: id)
             }
-            break
         case .addEthereumChain:
             guard let (chainId, name, rpcUrls) = extractChainInfo(json: json) else { return }
             alert(title: name, message: "chainId: \(chainId)\n \(rpcUrls.joined(separator: "\n")))")
@@ -156,6 +162,22 @@ extension DAppWebViewController: WKScriptMessageHandler {
         }))
         alert.addAction(UIAlertAction(title: "OK", style: .default, handler: { [weak webview] _ in
             let signed = self.signMessage(data: data, addPrefix: addPrefix)
+            webview?.sendResult("0x" + signed.hexString, to: id)
+        }))
+        present(alert, animated: true, completion: nil)
+    }
+
+    func handleSignTypedMessage(id: Int64, data: Data, raw: String) {
+        let alert = UIAlertController(
+            title: "Sign Typed Message",
+            message: raw,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Cancel", style: .destructive, handler: { [weak webview] _ in
+            webview?.sendError("Canceled", to: id)
+        }))
+        alert.addAction(UIAlertAction(title: "OK", style: .default, handler: { [weak webview] _ in
+            let signed = self.signMessage(data: data, addPrefix: false)
             webview?.sendResult("0x" + signed.hexString, to: id)
         }))
         present(alert, animated: true, completion: nil)
@@ -203,6 +225,16 @@ extension DAppWebViewController: WKScriptMessageHandler {
             return nil
         }
         return (chainId: string, name: name, rpcUrls: urls)
+    }
+
+    private func extractRaw(json: [String: Any]) -> String? {
+        guard
+            let params = json["object"] as? [String: Any],
+            let raw = params["raw"] as? String
+        else {
+            return nil
+        }
+        return raw
     }
 
     private func signMessage(data: Data, addPrefix: Bool = true) -> Data {
