@@ -91,7 +91,6 @@ class Utils {
   static isValidAddress(hexAddress) {
     if (typeof (hexAddress) !== 'string') return false
     let isAddress = /^0x[0-9a-fA-F]{40}$/.test(hexAddress)
-    console.error("====== isAddress: "+isAddress)
     return isAddress
   }
 

@@ -79,6 +79,7 @@ describe("TrustWeb3Provider constructor tests", () => {
 
     web3.currentProvider.setConfig(mainnet);
     expect(web3.currentProvider.chainId).toEqual("0x1");
+    expect(web3.currentProvider.networkVersion).toEqual(1);
     expect(web3.currentProvider.rpc.rpcUrl).toBe(mainnet.rpcUrl);
 
     expect(provider.request).not.toBeUndefined;
@@ -285,7 +286,7 @@ describe("TrustWeb3Provider constructor tests", () => {
       done();
     });
   });
-  
+
   test("test personal_sign custom customMethodMessage signMessageHash", (done) => {
     trustwallet.customMethodMessage = {
       signMessageHash: {
@@ -365,21 +366,22 @@ describe("TrustWeb3Provider constructor tests", () => {
   });
 
   test("test eth_sign utf8 String custom customMethodMessage signMessageHash", (done) => {
+    var messageHex = "An amazing message, for use with MetaMask!"
+    const signed = signUtil.personalSign(ethUtil.toBuffer(privateKey), { data: messageHex });
+
     trustwallet.customMethodMessage = {
       signMessageHash: {
         postMessage: (message) => {
-          var hashMessage = ethUtil.keccak256(ethUtil.toBuffer(message.object.data))
-          var signMessage = ethUtil.ecsign(hashMessage, ethUtil.toBuffer(privateKey))
-          var signMessageHex = ethUtil.bufferToHex(signUtil.concatSig(signMessage.v, signMessage.r, signMessage.s))
-          provider.sendResponse(message.id, signMessageHex);
+          const buffer = Buffer.from(message.object.data);
+          if (buffer.length === 0) {
+            throw new Error("message is not hex!");
+          }
+          provider.sendResponse(message.id, signed);
         }
       }
     }
 
     const provider = new trustwallet.Provider(mainnet);
-
-    var messageHex = "An amazing message, for use with MetaMask!"
-    const signed = signUtil.personalSign(ethUtil.toBuffer(privateKey), { data: messageHex });
 
     const request = {
       method: "eth_sign",

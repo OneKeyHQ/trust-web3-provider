@@ -254,6 +254,8 @@ class TrustWeb3Provider extends EventEmitter {
           return this.personal_ecRecover(payload);
         case "eth_signTypedData":
           return this.eth_signTypedData(payload, 'v1');
+        case "eth_signTypedData_v1":
+          return this.eth_signTypedData(payload, 'v1');
         case "eth_signTypedData_v3":
           return this.eth_signTypedData(payload, "v3");
         case "eth_signTypedData_v4":
@@ -318,17 +320,12 @@ class TrustWeb3Provider extends EventEmitter {
     const address = params[0]
     const message = params[1]
 
-    const buffer = Utils.messageToBuffer(params[1]);
+    const buffer = Utils.messageToBuffer(message);
+    const hex = Utils.bufferToHex(buffer);
+
     if (isUtf8(buffer)) {
-      if (buffer.length === 0) {
-        // hex it
-        const hex = Utils.bufferToHex(message);
-        this.postMessage("signPersonalMessage", payload.id, { data: hex, from: address });
-      } else {
-        this.postMessage("signPersonalMessage", payload.id, { data: message, from: address });
-      }
+      this.postMessage("signPersonalMessage", payload.id, { data: hex, from: address });
     } else {
-      const hex = Utils.bufferToHex(buffer);
       this.postMessage("signMessage", payload.id, { data: hex, from: address });
     }
   }
