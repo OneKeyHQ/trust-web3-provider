@@ -34,9 +34,6 @@ class TrustWeb3Provider extends EventEmitter {
 
     // @deprecated Use ethereum.request({ method: 'eth_accounts' }) instead.
     this.selectedAddress = config.address
-
-    // @deprecated Use ethereum.request({ method: 'eth_chainId' }) instead.
-    if (config.chainId) { this.networkVersion = parseInt("this.chainId", 16) }
   }
 
   setAddress(address) {
@@ -54,16 +51,26 @@ class TrustWeb3Provider extends EventEmitter {
 
   setChainId(chainId) {
     let hexChainId
+    let networkVersion
     if (isHexadecimal(chainId)) {
       hexChainId = chainId;
+      networkVersion = parseInt(chainId, 16);
     } else {
-      hexChainId = "0x" + chainId.toString(16);
+      try {
+        networkVersion = chainId
+        hexChainId = "0x" + chainId.toString(16);
+      } catch (error) {
+        networkVersion = 1
+        hexChainId = "0x1"
+      }
     }
+    this.networkVersion = networkVersion;
     this.chainId = hexChainId;
     for (var i = 0; i < window.frames.length; i++) {
       const frame = window.frames[i];
       if (frame.ethereum && frame.ethereum.isTrust) {
         frame.ethereum.chainId = hexChainId;
+        frame.ethereum.networkVersion = networkVersion;
       }
     }
   }
