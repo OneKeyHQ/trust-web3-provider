@@ -314,17 +314,29 @@ class TrustWeb3Provider extends EventEmitter {
     return this.chainId;
   }
 
+
   eth_sign(payload) {
     const params = payload.params
 
     const address = params[0]
-    const message = params[1]
+    let message = params[1]
 
     const buffer = Utils.messageToBuffer(message);
     const hex = Utils.bufferToHex(buffer);
 
-    if (isUtf8(buffer)) {
-      this.postMessage("signPersonalMessage", payload.id, { data: hex, from: address });
+    if (isUtf8(buffer) && buffer.length != 32) {
+      try {
+        if (typeof message === "string" && message.startsWith("0x")) {
+          const buffer = Buffer.from(message.replace("0x", ""), "hex")
+          if (isUtf8(buffer) && buffer != 0) {
+            message = buffer.toString('utf-8')
+          }
+        }
+      } catch (error) {
+        console.error(error)
+      }
+
+      this.postMessage("signPersonalMessage", payload.id, { data: message, from: address });
     } else {
       this.postMessage("signMessage", payload.id, { data: hex, from: address });
     }
@@ -336,7 +348,7 @@ class TrustWeb3Provider extends EventEmitter {
     const second = Utils.messageToBuffer(params[1]);
 
     let message, address;
-    if (this.customHandler.resemblesData(second) && this.customHandler.resemblesAddress(first)) {
+    if ((this.customHandler.resemblesData(second) || isUtf8(second)) && this.customHandler.resemblesAddress(first)) {
       address = params[0]
       message = params[1]
     } else {
@@ -344,14 +356,18 @@ class TrustWeb3Provider extends EventEmitter {
       address = params[1]
     }
 
-    const buffer = Utils.messageToBuffer(message);
-    if (buffer.length === 0) {
-      // hex it
-      const hex = Utils.bufferToHex(message);
-      this.postMessage("signPersonalMessage", payload.id, { data: hex, from: address });
-    } else {
-      this.postMessage("signPersonalMessage", payload.id, { data: message, from: address });
+    try {
+      if (typeof message === "string" && message.startsWith("0x")) {
+        const buffer = Buffer.from(message.replace("0x", ""), "hex")
+        if (isUtf8(buffer) && buffer != 0) {
+          message = buffer.toString('utf-8')
+        }
+      }
+    } catch (error) {
+      console.error(error)
     }
+
+    this.postMessage("signPersonalMessage", payload.id, { data: message, from: address });
   }
 
   personal_ecRecover(payload) {

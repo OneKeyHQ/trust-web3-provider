@@ -11,6 +11,8 @@ var signUtil = require("eth-sig-util");
 require("../index");
 const trustwallet = window.trustwallet;
 const Web3 = require("web3");
+const { TypedDataUtils } = require("../hashMessage");
+import Utils from "../utils";
 
 const address = "0xcaaf133b00d04b964798f6aa040b445263b458b0";
 const privateKey = "0x5e5c0a55709bfb193b97de696114ad97e9578126e47823e0edf3d5abecd74f71";
@@ -227,13 +229,14 @@ describe("TrustWeb3Provider constructor tests", () => {
     );
     var hex = "0x" + hash.toString("hex");
 
-    var sign = ethUtil.ecsign(hash, ethUtil.toBuffer(privateKey))
-    const signed = ethUtil.bufferToHex(ethUtil.toRpcSig(sign.v, sign.r, sign.s))
-
     trustwallet.postMessage = (message) => {
+      var sign = ethUtil.ecsign(hash, ethUtil.toBuffer(privateKey))
+      const signed = ethUtil.bufferToHex(ethUtil.toRpcSig(sign.v, sign.r, sign.s))
       provider.sendResponse(message.id, signed);
     };
 
+    var sign = ethUtil.ecsign(hash, ethUtil.toBuffer(privateKey))
+    const signed = ethUtil.bufferToHex(ethUtil.toRpcSig(sign.v, sign.r, sign.s))
     web3.eth.sign(addresses[0], hex, (err, result) => {
       expect(result).toEqual(signed);
       done();
@@ -243,26 +246,86 @@ describe("TrustWeb3Provider constructor tests", () => {
   test("test personal_sign", (done) => {
     const provider = new trustwallet.Provider(bsc);
 
-    const signed = signUtil.personalSign(ethUtil.toBuffer(privateKey), { "version": "0.1.2", "timestamp": "1602823075", "token": "0x4b0f1812e5df2a09796481ff14017e6005508003", "type": "vote", "payload": { "proposal": "QmSV53XuYi28XfdNHDhBVp2ZQwzeewQNBcaDedRi9PC6eY", "choice": 1, "metadata": {} } })
-
     trustwallet.postMessage = (message) => {
       const buffer = Buffer.from(message.object.data);
       if (buffer.length === 0) {
         throw new Error("message is not hex!");
       }
+      const signed = signUtil.personalSign(ethUtil.toBuffer(privateKey), message.object.data)
       provider.sendResponse(message.id, signed);
     };
 
+    const buffer = Buffer.from("{\"version\":\"0.1.2\",\"timestamp\":\"1602823075\",\"token\":\"0x4b0f1812e5df2a09796481ff14017e6005508003\",\"type\":\"vote\",\"payload\":{\"proposal\":\"QmSV53XuYi28XfdNHDhBVp2ZQwzeewQNBcaDedRi9PC6eY\",\"choice\":1,\"metadata\":{}}}")
+    const msg = Utils.bufferToHex(buffer)
     const request = {
       method: "personal_sign",
       params: [
-        "{\"version\":\"0.1.2\",\"timestamp\":\"1602823075\",\"token\":\"0x4b0f1812e5df2a09796481ff14017e6005508003\",\"type\":\"vote\",\"payload\":{\"proposal\":\"QmSV53XuYi28XfdNHDhBVp2ZQwzeewQNBcaDedRi9PC6eY\",\"choice\":1,\"metadata\":{}}}",
+        msg,
         "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
       ],
       id: 1602823075454,
     };
 
     expect(Buffer.from(request.params[0], "hex").length).toEqual(0);
+    const signed = signUtil.personalSign(ethUtil.toBuffer(privateKey), msg)
+    provider.request(request).then((result) => {
+      expect(result).toEqual(signed);
+      done();
+    });
+  });
+
+  test("test personal_sign Buffer", (done) => {
+    const provider = new trustwallet.Provider(bsc);
+
+    trustwallet.postMessage = (message) => {
+      const buffer = Buffer.from(message.object.data);
+      if (buffer.length === 0) {
+        throw new Error("message is not hex!");
+      }
+      const signed = signUtil.personalSign(ethUtil.toBuffer(privateKey), message.object.data)
+      provider.sendResponse(message.id, signed);
+    };
+
+    const msg = Buffer.from("{\"version\":\"0.1.2\",\"timestamp\":\"1602823075\",\"token\":\"0x4b0f1812e5df2a09796481ff14017e6005508003\",\"type\":\"vote\",\"payload\":{\"proposal\":\"QmSV53XuYi28XfdNHDhBVp2ZQwzeewQNBcaDedRi9PC6eY\",\"choice\":1,\"metadata\":{}}}")
+    const request = {
+      method: "personal_sign",
+      params: [
+        msg,
+        "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
+      ],
+      id: 1602823075454,
+    };
+
+    const signed = signUtil.personalSign(ethUtil.toBuffer(privateKey), msg)
+    provider.request(request).then((result) => {
+      expect(result).toEqual(signed);
+      done();
+    });
+  });
+
+  test("test personal_sign utf-8", (done) => {
+    const provider = new trustwallet.Provider(bsc);
+
+    trustwallet.postMessage = (message) => {
+      const buffer = Buffer.from(message.object.data);
+      if (buffer.length === 0) {
+        throw new Error("message is not hex!");
+      }
+      const signed = signUtil.personalSign(ethUtil.toBuffer(privateKey), message.object.data)
+      provider.sendResponse(message.id, signed);
+    };
+
+    const msg = "Hello onekey"
+    const request = {
+      method: "personal_sign",
+      params: [
+        msg,
+        "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
+      ],
+      id: 1602823075454,
+    };
+
+    const signed = signUtil.personalSign(ethUtil.toBuffer(privateKey), msg)
 
     provider.request(request).then((result) => {
       expect(result).toEqual(signed);
